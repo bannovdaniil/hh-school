@@ -5,9 +5,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.stream.Stream;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import ru.hh.school.homework.utils.GetAllDirectories;
+
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
@@ -18,6 +21,12 @@ import static java.util.stream.Collectors.toMap;
 public class Launcher {
 
   public static void main(String[] args) throws IOException {
+    GetAllDirectories getAllDirectories = new GetAllDirectories(Constants.ROOT_DIRECTORY);
+    getAllDirectories.search();
+
+    getAllDirectories.getPaths().forEach(System.out::println);
+
+    System.exit(0);
     // Написать код, который, как можно более параллельно:
     // - по заданному пути найдет все "*.java" файлы
     // - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
@@ -50,16 +59,15 @@ public class Launcher {
   private static Map<String, Long> naiveCount(Path path) {
     try {
       return Files.lines(path)
-        .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
-        .filter(word -> word.length() > 3)
-        .collect(groupingBy(identity(), counting()))
-        .entrySet()
-        .stream()
-        .sorted(comparingByValue(reverseOrder()))
-        .limit(10)
-        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-    catch (IOException e) {
+          .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
+          .filter(word -> word.length() > 3)
+          .collect(groupingBy(identity(), counting()))
+          .entrySet()
+          .stream()
+          .sorted(comparingByValue(reverseOrder()))
+          .limit(10)
+          .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
@@ -70,9 +78,9 @@ public class Launcher {
 
   private static long naiveSearch(String query) throws IOException {
     Document document = Jsoup //
-      .connect("https://www.google.com/search?q=" + query) //
-      .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36") //
-      .get();
+        .connect("https://www.google.com/search?q=" + query) //
+        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36") //
+        .get();
 
     Element divResultStats = document.select("div#slim_appbar").first();
     String text = divResultStats.text();
