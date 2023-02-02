@@ -8,17 +8,22 @@ import java.util.List;
 
 public class GetAllDirectories {
   private List<Path> paths;
-  private Path searchPath;
+  private final Path searchPath;
 
   public GetAllDirectories(String searchPath) {
     this.searchPath = Paths.get(searchPath);
   }
 
-  public void search() throws IOException {
-    paths = Files.walk(searchPath)
-        .parallel()
-        .filter(path -> path.toFile().isDirectory())
-        .toList();
+  public void search() {
+    try (var fileStream = Files.walk(searchPath)) {
+      paths = fileStream
+          .parallel()
+          .filter(path -> path.toFile().isDirectory())
+          .toList();
+    } catch (IOException err) {
+      paths = List.of();
+      throw new RuntimeException(err.getMessage());
+    }
   }
 
   public List<Path> getPaths() {

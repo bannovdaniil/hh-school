@@ -3,13 +3,18 @@ package ru.hh.school.homework;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
 import ru.hh.school.homework.utils.GetAllDirectories;
+import ru.hh.school.homework.utils.GetFilesFromDirectory;
 
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
@@ -17,14 +22,25 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toMap;
+import static org.slf4j.LoggerFactory.getLogger;
 
 public class Launcher {
+  private static final Logger LOGGER = getLogger(Launcher.class);
 
   public static void main(String[] args) throws IOException {
     GetAllDirectories getAllDirectories = new GetAllDirectories(Constants.ROOT_DIRECTORY);
     getAllDirectories.search();
+    var paths = getAllDirectories.getPaths();
 
-    getAllDirectories.getPaths().forEach(System.out::println);
+    ExecutorService executorService = Executors.newFixedThreadPool(Constants.NCPU);
+
+    paths.forEach(path -> {
+          var files = GetFilesFromDirectory.search(path, Constants.EXTENSION);
+          LOGGER.info("Path: {}", path);
+          files.forEach(System.out::println);
+        }
+    );
+
 
     System.exit(0);
     // Написать код, который, как можно более параллельно:
@@ -48,7 +64,6 @@ public class Launcher {
 
     // test our naive methods:
     testCount();
-    testSearch();
   }
 
   private static void testCount() {
@@ -70,10 +85,6 @@ public class Launcher {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private static void testSearch() throws IOException {
-    System.out.println(naiveSearch("public"));
   }
 
   private static long naiveSearch(String query) throws IOException {
