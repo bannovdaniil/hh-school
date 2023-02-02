@@ -1,14 +1,5 @@
 package ru.hh.school.homework;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Stream;
-
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -16,12 +7,18 @@ import org.slf4j.Logger;
 import ru.hh.school.homework.utils.GetAllDirectories;
 import ru.hh.school.homework.utils.GetFilesFromDirectory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Stream;
+
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.*;
 import static org.slf4j.LoggerFactory.getLogger;
 
 public class Launcher {
@@ -37,7 +34,11 @@ public class Launcher {
     paths.forEach(path -> {
           var files = GetFilesFromDirectory.search(path, Constants.EXTENSION);
           LOGGER.info("Path: {}", path);
-          files.forEach(System.out::println);
+          files.forEach((file) -> {
+                Map<String, Long> frequencyOfWords = naiveCount(file);
+                System.out.printf("%s - %s - %d%n", path, file.getFileName(), 1L);
+              }
+          );
         }
     );
 
@@ -63,12 +64,6 @@ public class Launcher {
     // При желании naiveSearch и naiveCount можно оптимизировать.
 
     // test our naive methods:
-    testCount();
-  }
-
-  private static void testCount() {
-    Path path = Path.of("d:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism\\Runner.java");
-    System.out.println(naiveCount(path));
   }
 
   private static Map<String, Long> naiveCount(Path path) {
