@@ -1,8 +1,8 @@
 package ru.hh.school.homework;
 
 import ru.hh.school.homework.utils.FrequenciesUtils;
-import ru.hh.school.homework.utils.GetAllDirectories;
-import ru.hh.school.homework.utils.GetFilesFromDirectory;
+import ru.hh.school.homework.utils.DirectoriesFromPath;
+import ru.hh.school.homework.utils.FilesFromDirectory;
 import ru.hh.school.homework.utils.GoogleWordSearch;
 
 import java.nio.file.Path;
@@ -39,16 +39,16 @@ public class Launcher {
   private static final GoogleWordSearch googleWordSearch = new GoogleWordSearch();
 
   public static void main(String[] args) {
-    GetAllDirectories getAllDirectories = new GetAllDirectories(Constants.ROOT_DIRECTORY);
-    getAllDirectories.search();
-    var paths = getAllDirectories.getPaths();
+    DirectoriesFromPath directoriesFromPath = new DirectoriesFromPath(Constants.ROOT_DIRECTORY);
+    directoriesFromPath.search();
+    var paths = directoriesFromPath.getPaths();
 
 
     List<CompletableFuture<Void>> cfs =
         paths.stream().map(path ->
             CompletableFuture.supplyAsync(() -> {
                   Constants.LOGGER.info("Path: {}", path);
-                  return GetFilesFromDirectory.search(path, Constants.EXTENSION);
+                  return FilesFromDirectory.search(path, Constants.EXTENSION);
                 })
                 .thenAccept(files ->
                     CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(files))

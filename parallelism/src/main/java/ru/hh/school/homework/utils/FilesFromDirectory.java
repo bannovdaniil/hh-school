@@ -7,7 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-public class GetFilesFromDirectory {
+public class FilesFromDirectory {
 
   public static List<Path> search(Path searchPath, String extension) {
     List<Path> files;

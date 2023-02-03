@@ -8,11 +8,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-public class GetAllDirectories {
+public class DirectoriesFromPath {
   private List<Path> paths;
   private final Path searchPath;
 
-  public GetAllDirectories(String searchPath) {
+  public DirectoriesFromPath(String searchPath) {
     this.searchPath = Paths.get(searchPath);
   }
 
