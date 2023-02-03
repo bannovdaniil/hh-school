@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -34,8 +35,10 @@ public class Launcher {
     paths.forEach(path -> {
           var files = GetFilesFromDirectory.search(path, Constants.EXTENSION);
           LOGGER.info("Path: {}", path);
+          Map<String, Long> frequencyOfWordsToPath = new ConcurrentHashMap<>();
+
           files.forEach((file) -> {
-                Map<String, Long> frequencyOfWords = naiveCount(file);
+                 naiveCount(file);
                 System.out.printf("%s - %s - %d%n", path, file.getFileName(), 1L);
               }
           );
@@ -65,6 +68,8 @@ public class Launcher {
 
     // test our naive methods:
   }
+
+
 
   private static Map<String, Long> naiveCount(Path path) {
     try {
