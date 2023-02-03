@@ -1,5 +1,7 @@
 package ru.hh.school.homework.utils;
 
+import ru.hh.school.homework.exception.LoggerIOErrorException;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,7 +17,7 @@ public class GetFilesFromDirectory {
           .filter(path -> path.toString().endsWith(extension))
           .toList();
     } catch (IOException err) {
-      throw new RuntimeException(err.getMessage());
+      throw new LoggerIOErrorException(err.getMessage());
     }
     return files;
   }

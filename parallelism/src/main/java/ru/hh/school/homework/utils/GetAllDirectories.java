@@ -1,5 +1,7 @@
 package ru.hh.school.homework.utils;
 
+import ru.hh.school.homework.exception.LoggerIOErrorException;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +24,7 @@ public class GetAllDirectories {
           .toList();
     } catch (IOException err) {
       paths = List.of();
-      throw new RuntimeException(err.getMessage());
+      throw new LoggerIOErrorException(err.getMessage());
     }
   }
 
