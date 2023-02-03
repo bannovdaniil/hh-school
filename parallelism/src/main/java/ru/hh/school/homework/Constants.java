@@ -10,5 +10,7 @@ public class Constants {
   public static final int NCPU = Runtime.getRuntime().availableProcessors();
   public static final int TOP_WORDS_LIMIT = 10;
   public static final Logger LOGGER = getLogger(Launcher.class);
+  public static final int MIN_STEEL_TIME = 2000;
+  public static final int MAX_SEARCH_THREAD = 1;
 
 }

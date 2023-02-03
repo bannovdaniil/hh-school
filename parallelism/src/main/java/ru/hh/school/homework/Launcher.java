@@ -1,31 +1,24 @@
 package ru.hh.school.homework;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.slf4j.Logger;
+import ru.hh.school.homework.utils.FrequenciesUtils;
 import ru.hh.school.homework.utils.GetAllDirectories;
 import ru.hh.school.homework.utils.GetFilesFromDirectory;
+import ru.hh.school.homework.utils.GoogleWordSearch;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.*;
-import static org.slf4j.LoggerFactory.getLogger;
 
 public class Launcher {
-  private static final Logger LOGGER = getLogger(Launcher.class);
 
   public static void main(String[] args) throws IOException {
+    GoogleWordSearch googleWordSearch = new GoogleWordSearch();
+
     GetAllDirectories getAllDirectories = new GetAllDirectories(Constants.ROOT_DIRECTORY);
     getAllDirectories.search();
     var paths = getAllDirectories.getPaths();
@@ -34,19 +27,23 @@ public class Launcher {
 
     paths.forEach(path -> {
           var files = GetFilesFromDirectory.search(path, Constants.EXTENSION);
-          LOGGER.info("Path: {}", path);
-          Map<String, Long> frequencyOfWordsToPath = new ConcurrentHashMap<>();
+          Constants.LOGGER.info("Path: {}", path);
 
+          Map<String, Long> frequencyOfWordsToPath = new ConcurrentHashMap<>();
+          FrequenciesUtils frequenciesUtils = new FrequenciesUtils(path);
           files.forEach((file) -> {
-                 naiveCount(file);
-                System.out.printf("%s - %s - %d%n", path, file.getFileName(), 1L);
-              }
-          );
+            frequenciesUtils.mergeWordsFrequencies(file);
+          });
+
+          frequenciesUtils.getTopWords().entrySet().stream()
+              .sorted(comparingByValue(reverseOrder()))
+              .forEach((element) -> {
+                long fq = googleWordSearch.naiveSearch(element.getKey());
+                System.out.printf("%s - %s - %d%n", path, element.getKey(), element.getValue());
+              });
         }
     );
 
-
-    System.exit(0);
     // Написать код, который, как можно более параллельно:
     // - по заданному пути найдет все "*.java" файлы
     // - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
@@ -67,36 +64,6 @@ public class Launcher {
     // При желании naiveSearch и naiveCount можно оптимизировать.
 
     // test our naive methods:
-  }
-
-
-
-  private static Map<String, Long> naiveCount(Path path) {
-    try {
-      return Files.lines(path)
-          .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
-          .filter(word -> word.length() > 3)
-          .collect(groupingBy(identity(), counting()))
-          .entrySet()
-          .stream()
-          .sorted(comparingByValue(reverseOrder()))
-          .limit(10)
-          .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static long naiveSearch(String query) throws IOException {
-    Document document = Jsoup //
-        .connect("https://www.google.com/search?q=" + query) //
-        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36") //
-        .get();
-
-    Element divResultStats = document.select("div#slim_appbar").first();
-    String text = divResultStats.text();
-    String resultsPart = text.substring(0, text.indexOf('('));
-    return Long.parseLong(resultsPart.replaceAll("[^0-9]", ""));
   }
 
 }
