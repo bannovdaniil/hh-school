@@ -6,8 +6,6 @@ import ru.hh.school.homework.exception.LoggerIOErrorException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -16,16 +14,9 @@ import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
-import static java.util.stream.Collectors.toMap;
 
 public class FrequenciesUtils {
-  private Map<String, Long> frequencyOfWords = new ConcurrentHashMap<>();
-  private Path directoryPath;
-  private List<Path> files = new ArrayList<>();
-
-  public FrequenciesUtils(Path directoryPath) {
-    this.directoryPath = directoryPath;
-  }
+  private final Map<String, Long> frequencyOfWords = new ConcurrentHashMap<>();
 
   public void mergeWordsFrequencies(Path file) {
     Map<String, Long> wordsFrequenciesIn = naiveCount(file);
@@ -47,7 +38,6 @@ public class FrequenciesUtils {
   }
 
   private Map<String, Long> naiveCount(Path file) {
-    files.add(file);
     Map<String, Long> resultFrequencyOfWords;
     try {
       resultFrequencyOfWords = Files.lines(file)
@@ -56,6 +46,7 @@ public class FrequenciesUtils {
           .collect(groupingBy(identity(), counting()))
           .entrySet()
           .stream()
+          .parallel()
           .sorted(comparingByValue(reverseOrder()))
           .limit(10)
           .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
