@@ -1,14 +1,16 @@
 package ru.hh.school.homework;
 
-import ru.hh.school.homework.utils.FrequenciesUtils;
 import ru.hh.school.homework.utils.DirectoriesFromPath;
 import ru.hh.school.homework.utils.FilesFromDirectory;
+import ru.hh.school.homework.utils.FrequenciesUtils;
 import ru.hh.school.homework.utils.GoogleWordSearch;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
@@ -43,6 +45,7 @@ public class Launcher {
     directoriesFromPath.search();
     var paths = directoriesFromPath.getPaths();
 
+    ExecutorService executorService = Executors.newFixedThreadPool(Constants.MAX_SEARCH_THREAD);
 
     List<CompletableFuture<Void>> cfs =
         paths.stream().map(path ->
@@ -52,11 +55,12 @@ public class Launcher {
                 })
                 .thenAccept(files ->
                     CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(files))
-                        .thenAccept(frequenciesList -> showWordsFrequencies(path, frequenciesList))
+                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService)
                 )
         ).toList();
 
     CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+    executorService.close();
   }
 
   private static Map<String, Long> getWordsFrequenciesList(List<Path> files) {
