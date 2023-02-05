@@ -49,14 +49,14 @@ public class Launcher {
 
     List<CompletableFuture<Void>> cfs =
         paths.stream().map(path ->
-            CompletableFuture.supplyAsync(() -> {
-                  Constants.LOGGER.info("Path: {}", path);
-                  return FilesFromDirectory.search(path, Constants.EXTENSION);
+            CompletableFuture.supplyAsync(() -> FilesFromDirectory.search(path, Constants.EXTENSION))
+                .thenAccept(fileList -> {
+                  if (fileList.size() > 0) {
+                    Constants.LOGGER.info("Path: {}, files: {}", path, fileList.size());
+                    CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
+                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
+                  }
                 })
-                .thenAccept(files ->
-                    CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(files))
-                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService)
-                )
         ).toList();
 
     CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
