@@ -1,10 +1,12 @@
 package ru.hh.school.homework;
 
+import org.slf4j.Logger;
 import ru.hh.school.homework.utils.DirectoriesFromPath;
 import ru.hh.school.homework.utils.FilesFromDirectory;
 import ru.hh.school.homework.utils.FrequenciesUtils;
 import ru.hh.school.homework.utils.GoogleWordSearch;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,7 @@ import java.util.concurrent.Executors;
 
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
+import static org.slf4j.LoggerFactory.getLogger;
 
 /**
  * Написать код, который, как можно более параллельно:
@@ -38,38 +41,38 @@ import static java.util.Map.Entry.comparingByValue;
  * test our naive methods:
  */
 public class Launcher {
+  public static final Logger LOGGER = getLogger(Launcher.class);
   private static final GoogleWordSearch googleWordSearch = new GoogleWordSearch();
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
     DirectoriesFromPath directoriesFromPath = new DirectoriesFromPath(Constants.ROOT_DIRECTORY);
-    directoriesFromPath.search();
-    var paths = directoriesFromPath.getPaths();
+    var paths = directoriesFromPath.search();
 
-    ExecutorService executorService = Executors.newFixedThreadPool(Constants.MAX_SEARCH_THREAD);
+    try (ExecutorService executorService = Executors.newFixedThreadPool(Constants.MAX_SEARCH_THREAD)) {
 
-    List<CompletableFuture<Void>> cfs =
-        paths.stream().map(path ->
-            CompletableFuture.supplyAsync(() -> FilesFromDirectory.search(path, Constants.EXTENSION))
-                .thenAccept(fileList -> {
-                  if (fileList.size() > 0) {
-                    Constants.LOGGER.info("Path: {}, files: {}", path, fileList.size());
-                    CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
-                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
-                  }
-                })
-        ).toList();
+      List<CompletableFuture<Void>> cfs =
+          paths.stream().map(path ->
+              CompletableFuture.supplyAsync(() -> FilesFromDirectory.search(path, Constants.EXTENSION))
+                  .thenAccept(fileList -> {
+                    if (fileList.size() > 0) {
+                      LOGGER.info("Path: {}, files: {}", path, fileList.size());
+                      CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
+                          .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
+                    }
+                  })
+          ).toList();
 
-    CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
-    executorService.close();
+      CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+    } catch (IllegalArgumentException err) {
+      LOGGER.error("Error create ExecutorService, count of thread: {}", Constants.MAX_SEARCH_THREAD);
+      throw new IllegalArgumentException(err);
+    }
+
   }
 
   private static Map<String, Long> getWordsFrequenciesList(List<Path> files) {
     FrequenciesUtils frequenciesUtils = new FrequenciesUtils();
-    List<CompletableFuture<Void>> cfs = files.stream().map(file ->
-        CompletableFuture.runAsync(() -> frequenciesUtils.mergeWordsFrequencies(file))
-    ).toList();
-
-    CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+    files.stream().parallel().forEach(file -> frequenciesUtils.mergeWordsFrequencies(file));
 
     return frequenciesUtils.getTopWords();
   }
