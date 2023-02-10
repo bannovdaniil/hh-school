@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,20 +50,20 @@ public class Launcher {
     var paths = directoriesFromPath.search();
 
     try (ExecutorService executorService = Executors.newFixedThreadPool(Constants.MAX_SEARCH_THREAD)) {
-
+      List<CompletableFuture<Void>> innerCfs = new CopyOnWriteArrayList<>();
       List<CompletableFuture<Void>> cfs =
           paths.stream().map(path ->
               CompletableFuture.supplyAsync(() -> FilesFromDirectory.search(path, Constants.EXTENSION))
-                  .thenAccept(fileList -> {
-                    if (fileList.size() > 0) {
-                      LOGGER.info("Path: {}, files: {}", path, fileList.size());
-                      CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
-                          .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
-                    }
-                  })
+                  .thenApply(fileList -> {
+                    LOGGER.info("Path: {}, files: {}", path, fileList.size());
+                    return CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
+                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
+                  }).thenAccept(cf -> innerCfs.add(cf))
           ).toList();
 
       CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+      CompletableFuture.allOf(innerCfs.toArray(new CompletableFuture[0])).join();
+
     } catch (IllegalArgumentException err) {
       LOGGER.error("Error create ExecutorService, count of thread: {}", Constants.MAX_SEARCH_THREAD);
       throw new IllegalArgumentException(err);
