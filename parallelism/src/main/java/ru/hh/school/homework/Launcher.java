@@ -1,83 +1,89 @@
 package ru.hh.school.homework;
 
+import org.slf4j.Logger;
+import ru.hh.school.homework.utils.DirectoriesFromPath;
+import ru.hh.school.homework.utils.FilesFromDirectory;
+import ru.hh.school.homework.utils.FrequenciesUtils;
+import ru.hh.school.homework.utils.GoogleWordSearch;
+
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import static java.util.Collections.reverseOrder;
 import static java.util.Map.Entry.comparingByValue;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toMap;
+import static org.slf4j.LoggerFactory.getLogger;
 
+/**
+ * Написать код, который, как можно более параллельно:
+ * - по заданному пути найдет все "*.java" файлы
+ * - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
+ * - соберет top 10 для каждой папки в которой есть хотя-бы один java файл
+ * - для каждого слова сходит в гугл и вернет количество результатов по нему (см. #naiveSearch())
+ * - распечатает в консоль результаты в виде:
+ * <папка1> - <слово #1> - <кол-во результатов в гугле>
+ * <папка1> - <слово #2> - <кол-во результатов в гугле>
+ * ...
+ * <папка1> - <слово #10> - <кол-во результатов в гугле>
+ * <папка2> - <слово #1> - <кол-во результатов в гугле>
+ * <папка2> - <слово #2> - <кол-во результатов в гугле>
+ * ...
+ * <папка2> - <слово #10> - <кол-во результатов в гугле>
+ * ...
+ * <p>
+ * Порядок результатов в консоли не обязательный.
+ * При желании naiveSearch и naiveCount можно оптимизировать.
+ * <p>
+ * test our naive methods:
+ */
 public class Launcher {
+  public static final Logger LOGGER = getLogger(Launcher.class);
+  private static final GoogleWordSearch googleWordSearch = new GoogleWordSearch();
 
   public static void main(String[] args) throws IOException {
-    // Написать код, который, как можно более параллельно:
-    // - по заданному пути найдет все "*.java" файлы
-    // - для каждого файла вычислит 10 самых популярных слов (см. #naiveCount())
-    // - соберет top 10 для каждой папки в которой есть хотя-бы один java файл
-    // - для каждого слова сходит в гугл и вернет количество результатов по нему (см. #naiveSearch())
-    // - распечатает в консоль результаты в виде:
-    // <папка1> - <слово #1> - <кол-во результатов в гугле>
-    // <папка1> - <слово #2> - <кол-во результатов в гугле>
-    // ...
-    // <папка1> - <слово #10> - <кол-во результатов в гугле>
-    // <папка2> - <слово #1> - <кол-во результатов в гугле>
-    // <папка2> - <слово #2> - <кол-во результатов в гугле>
-    // ...
-    // <папка2> - <слово #10> - <кол-во результатов в гугле>
-    // ...
-    //
-    // Порядок результатов в консоли не обязательный.
-    // При желании naiveSearch и naiveCount можно оптимизировать.
+    DirectoriesFromPath directoriesFromPath = new DirectoriesFromPath(Constants.ROOT_DIRECTORY);
+    var paths = directoriesFromPath.search();
 
-    // test our naive methods:
-    testCount();
-    testSearch();
+    try (ExecutorService executorService = Executors.newFixedThreadPool(Constants.MAX_SEARCH_THREAD)) {
+      List<CompletableFuture<Void>> cfs =
+          paths.stream().map(path ->
+              CompletableFuture.supplyAsync(() -> FilesFromDirectory.search(path, Constants.EXTENSION))
+                  .thenCompose(fileList -> {
+                    LOGGER.info("Path: {}, files: {}", path, fileList.size());
+                    return CompletableFuture.supplyAsync(() -> getWordsFrequenciesList(fileList))
+                        .thenAcceptAsync(frequenciesList -> showWordsFrequencies(path, frequenciesList), executorService);
+                  })
+          ).toList();
+
+      CompletableFuture.allOf(cfs.toArray(new CompletableFuture[0])).join();
+
+    } catch (IllegalArgumentException err) {
+      LOGGER.error("Error create ExecutorService, count of thread: {}", Constants.MAX_SEARCH_THREAD);
+      throw new IllegalArgumentException(err);
+    }
+
   }
 
-  private static void testCount() {
-    Path path = Path.of("d:\\projects\\work\\hh-school\\parallelism\\src\\main\\java\\ru\\hh\\school\\parallelism\\Runner.java");
-    System.out.println(naiveCount(path));
+  private static Map<String, Long> getWordsFrequenciesList(List<Path> files) {
+    FrequenciesUtils frequenciesUtils = new FrequenciesUtils();
+    files.stream().parallel().forEach(file -> frequenciesUtils.mergeWordsFrequencies(file));
+
+    return frequenciesUtils.getTopWords();
   }
 
-  private static Map<String, Long> naiveCount(Path path) {
-    try {
-      return Files.lines(path)
-        .flatMap(line -> Stream.of(line.split("[^a-zA-Z0-9]")))
-        .filter(word -> word.length() > 3)
-        .collect(groupingBy(identity(), counting()))
-        .entrySet()
-        .stream()
+  private static void showWordsFrequencies(Path path, Map<String, Long> frequenciesList) {
+    frequenciesList.entrySet().stream()
+        .parallel()
         .sorted(comparingByValue(reverseOrder()))
-        .limit(10)
-        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-    catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static void testSearch() throws IOException {
-    System.out.println(naiveSearch("public"));
-  }
-
-  private static long naiveSearch(String query) throws IOException {
-    Document document = Jsoup //
-      .connect("https://www.google.com/search?q=" + query) //
-      .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.116 Safari/537.36") //
-      .get();
-
-    Element divResultStats = document.select("div#slim_appbar").first();
-    String text = divResultStats.text();
-    String resultsPart = text.substring(0, text.indexOf('('));
-    return Long.parseLong(resultsPart.replaceAll("[^0-9]", ""));
+        .forEachOrdered(element -> {
+          long fq = googleWordSearch.naiveSearch(element.getKey());
+          System.out.printf("%s - %s - %d%n", path, element.getKey(), fq);
+        });
   }
 
 }
